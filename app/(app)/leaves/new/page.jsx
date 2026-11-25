@@ -24,13 +24,13 @@ export default async function NewLeave({ searchParams }) {
               <Field label="Tanggal mulai"><input type="date" name="start_date" required className={inp} /></Field>
               <Field label="Tanggal selesai"><input type="date" name="end_date" className={inp} /></Field>
             </div>
-            <Field label="Alasan cuti"><textarea name="reason" required rows={3} className={inp} /></Field>
+            <Field label="Alasan cuti"><textarea name="reason" required rows={3} maxLength={500} className={inp} /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Rekan pengganti (handover)"><select name="substitute_id" required className={inp}><option value="">Pilih rekan</option>{subs.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}</select></Field>
-              <Field label="Nomor darurat"><input name="emergency_phone" defaultValue={u.phone || ""} className={inp} /></Field>
+              <Field label="Nomor darurat"><input name="emergency_phone" defaultValue={u.phone || ""} maxLength={30} className={inp} /></Field>
             </div>
-            <Field label="Catatan tugas"><textarea name="handover_note" rows={3} className={inp} /></Field>
-            <Field label="Alamat selama cuti"><input name="address" defaultValue={u.address || ""} className={inp} /></Field>
+            <Field label="Catatan tugas"><textarea name="handover_note" rows={3} maxLength={1000} className={inp} /></Field>
+            <Field label="Alamat selama cuti"><input name="address" defaultValue={u.address || ""} maxLength={255} className={inp} /></Field>
             <Field label="Lampiran (PDF/JPG/PNG, maks 5 MB; wajib untuk jenis tertentu)"><input type="file" name="attachment" className={inp} /></Field>
             <div className="flex gap-2"><button className={btn}>Kirim pengajuan</button><button type="reset" className={btn2}>Reset</button><Link href="/leaves" className={btn2}>Batal</Link></div>
           </form>

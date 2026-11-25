@@ -8,9 +8,9 @@ import { Alert, Card, Status, Title, inp, btn2, btnR } from "@/components/ui";
 import { fmtDate, fmtDateTime, fmtPeriod, fmtNum } from "@/lib/fmt";
 
 const Item = ({ k, v }) => (
-  <div>
+  <div className="min-w-0">
     <dt className="text-xs font-semibold uppercase text-slate-500">{k}</dt>
-    <dd className="text-sm">{v || "-"}</dd>
+    <dd className="text-sm [overflow-wrap:anywhere]">{v || "-"}</dd>
   </div>
 );
 
@@ -54,7 +54,7 @@ export default async function Detail({ params, searchParams }) {
     ...ap.map((a) => ({
       title: `${a.decision === "approved" ? "Disetujui" : "Ditolak"} ${a.level === "leader" ? "Ketua Divisi" : "HRD"}`,
       sub: `${a.full_name}, ${fmtDateTime(a.decided_at)}`,
-      note: a.note ? `Catatan: ${a.note}` : null,
+      note: a.note && a.decision === "approved" ? `Catatan: ${a.note}` : null,
       c: a.decision === "approved" ? "bg-teal-700" : "bg-red-700",
     })),
   ];
@@ -86,7 +86,7 @@ export default async function Detail({ params, searchParams }) {
 
       <Alert err={sp?.err} />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <h2 className="mb-4 text-lg font-bold">Rincian pengajuan</h2>
 
