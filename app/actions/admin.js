@@ -8,7 +8,27 @@ const g = (fd, k) => String(fd.get(k) || "").trim();
 const go = (to, m, k = "err") => redirect(`${to}${to.includes("?") ? "&" : "?"}${k}=${encodeURIComponent(m)}`);
 const dupMsg = (e) => (e.code === "23505" ? "Data sudah dipakai (nama, username, atau email harus unik)." : "Gagal menyimpan data.");
 
-/* ---------- Pengguna ---------- */
+export async function toggleUser(fd) {
+  const me = await requireUser(["admin"]);
+  const id = +fd.get("id"), activate = fd.get("activate") === "1";
+  const u = await q1("SELECT id, role FROM users WHERE id=$1", [id]);
+  if (!u) go("/users", "Pengguna tidak ditemukan.");
+  if (!activate) {
+    if (u.id === me.id) go("/users", "Anda tidak dapat menonaktifkan akun sendiri.");
+    if (fd.get("agree") !== "on") go(`/users?confirm=${id}`, "Centang persetujuan untuk melanjutkan.");
+    if (["admin", "hrd"].includes(u.role)) {
+      const n = (await q1("SELECT COUNT(*)::int n FROM users WHERE role=$1 AND is_active", [u.role])).n;
+      if (n <= 1) go("/users", `Tidak bisa: ini satu-satunya ${u.role === "admin" ? "Admin" : "HRD"} yang aktif.`);
+    }
+    if (await q1("SELECT 1 FROM divisions WHERE leader_id=$1", [id]))
+      go("/users", "Pengguna ini memimpin sebuah divisi. Ganti ketua divisi dulu di menu Divisi.");
+    const act = (await q1("SELECT COUNT(*)::int n FROM leave_requests WHERE user_id=$1 AND status IN ('pending','approved_leader')", [id])).n;
+    if (act > 0) go("/users", `Masih ada ${act} pengajuan cuti yang sedang diproses. Selesaikan atau batalkan dulu.`);
+  }
+  await q("UPDATE users SET is_active=$1 WHERE id=$2", [activate, id]);
+  go("/users", activate ? "Akun diaktifkan kembali." : "Akun dinonaktifkan. Riwayat cuti tetap tersimpan.", "ok");
+}
+
 export async function saveUser(fd) {
   await requireUser(["admin"]);
   const id = +fd.get("id") || null, B = id ? `/users?edit=${id}` : "/users";
@@ -21,9 +41,9 @@ export async function saveUser(fd) {
   if (!(quota >= 0 && quota <= 99)) go(B, "Kuota tidak valid.");
   try {
     if (id) {
-      await q(`UPDATE users SET full_name=$1, username=$2, email=$3, role=$4, division_id=$5, leave_quota=$6, is_active=$7,
-               join_date=COALESCE(NULLIF($8,'')::date, join_date) WHERE id=$9`,
-        [v.full_name, v.username, v.email.toLowerCase(), v.role, div, quota, fd.get("is_active") === "1", v.join_date, id]);
+      await q(`UPDATE users SET full_name=$1, username=$2, email=$3, role=$4, division_id=$5, leave_quota=$6,
+               join_date=COALESCE(NULLIF($7,'')::date, join_date) WHERE id=$8`,
+        [v.full_name, v.username, v.email.toLowerCase(), v.role, div, quota, v.join_date, id]);
       if (v.password) await q("UPDATE users SET password_hash=$1 WHERE id=$2", [await bcrypt.hash(v.password, 10), id]);
     } else {
       await q(`INSERT INTO users (full_name, username, email, password_hash, role, division_id, leave_quota, join_date)
@@ -33,23 +53,31 @@ export async function saveUser(fd) {
   } catch (e) { go(B, dupMsg(e)); }
   go("/users", "Pengguna disimpan.", "ok");
 }
+
 export async function deleteUser(fd) {
   await requireUser(["admin"]);
   const id = +fd.get("id");
-  const u = await q1("SELECT role FROM users WHERE id=$1", [id]);
+  const u = await q1("SELECT username, role FROM users WHERE id=$1", [id]);
   if (!u || !["employee", "leader"].includes(u.role)) go("/users", "Admin dan HRD tidak dapat dihapus.");
+  if (fd.get("agree") !== "on" || g(fd, "confirm") !== u.username)
+    go(`/users?del=${id}`, "Centang persetujuan dan ketik username dengan benar.");
+  const used = await q1(
+    `SELECT 1 FROM leave_requests WHERE user_id=$1 OR substitute_id=$1
+     UNION SELECT 1 FROM leave_approvals WHERE approver_id=$1
+     UNION SELECT 1 FROM divisions WHERE leader_id=$1`, [id]);
+  if (used) go("/users", "Pengguna punya riwayat cuti atau jabatan. Nonaktifkan saja, jangan dihapus.");
   try { await q("DELETE FROM users WHERE id=$1", [id]); }
-  catch { go("/users", "Pengguna sudah punya riwayat pengajuan. Nonaktifkan lewat Edit, jangan dihapus."); }
-  go("/users", "Pengguna dihapus.", "ok");
+  catch { go("/users", "Gagal menghapus. Nonaktifkan akun ini sebagai gantinya."); }
+  go("/users", "Pengguna dihapus permanen.", "ok");
 }
 
-/* ---------- Divisi ---------- */
 async function setLeader(run, divId, leaderId) {
   const old = (await run("SELECT leader_id FROM divisions WHERE id=$1", [divId]))[0]?.leader_id;
   if (old && old !== leaderId) await run("UPDATE users SET role='employee' WHERE id=$1 AND role='leader'", [old]);
   await run("UPDATE divisions SET leader_id=$1 WHERE id=$2", [leaderId, divId]);
   if (leaderId) await run("UPDATE users SET role='leader', division_id=$1 WHERE id=$2 AND role IN ('employee','leader')", [divId, leaderId]);
 }
+
 export async function saveDivision(fd) {
   await requireUser(["admin"]);
   const id = +fd.get("id") || null, B = id ? `/divisions?edit=${id}` : "/divisions";
@@ -65,6 +93,7 @@ export async function saveDivision(fd) {
   } catch (e) { go(B, e.code === "23505" ? "Nama divisi harus unik dan satu orang hanya memimpin satu divisi." : "Gagal menyimpan divisi."); }
   go("/divisions", "Divisi disimpan.", "ok");
 }
+
 export async function deleteDivision(fd) {
   await requireUser(["admin"]);
   const id = +fd.get("id"), d = await q1("SELECT name, leader_id FROM divisions WHERE id=$1", [id]);
@@ -76,12 +105,14 @@ export async function deleteDivision(fd) {
   });
   go("/divisions", "Divisi dihapus. Akun anggota tetap ada.", "ok");
 }
+
 export async function addMember(fd) {
   await requireUser(["admin"]);
   const div = +fd.get("division_id"), uid = +fd.get("user_id");
   if (uid) await q("UPDATE users SET division_id=$1 WHERE id=$2 AND role='employee'", [div, uid]);
   redirect(`/divisions?sel=${div}`);
 }
+
 export async function removeMember(fd) {
   await requireUser(["admin"]);
   const div = +fd.get("division_id");
@@ -89,7 +120,6 @@ export async function removeMember(fd) {
   redirect(`/divisions?sel=${div}`);
 }
 
-/* ---------- Jenis cuti ---------- */
 export async function saveLeaveType(fd) {
   await requireUser(["admin"]);
   const id = +fd.get("id") || null, B = id ? `/leave-types?edit=${id}` : "/leave-types";
@@ -107,7 +137,6 @@ export async function saveLeaveType(fd) {
   go("/leave-types", "Jenis cuti disimpan.", "ok");
 }
 
-/* ---------- Fitur lanjutan ---------- */
 export async function saveHoliday(fd) {
   await requireUser(["admin"]);
   const id = +fd.get("id") || null, B = "/holidays";
@@ -119,6 +148,7 @@ export async function saveHoliday(fd) {
   } catch (e) { go(B, "Tanggal tersebut sudah terdaftar."); }
   go(B, "Hari libur disimpan.", "ok");
 }
+
 export async function deleteHoliday(fd) { await requireUser(["admin"]); await q("DELETE FROM holidays WHERE id=$1", [+fd.get("id")]); redirect("/holidays"); }
 export async function saveCapacity(fd) {
   await requireUser(["admin"]);
@@ -127,10 +157,12 @@ export async function saveCapacity(fd) {
   await q("INSERT INTO settings (key, value) VALUES ('capacity_percent',$1) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value", [String(p)]);
   go("/holidays", "Batas kapasitas disimpan.", "ok");
 }
+
 export async function saveBlackout(fd) {
   await requireUser(["admin"]);
   if (!g(fd, "start_date") || !g(fd, "end_date") || g(fd, "end_date") < g(fd, "start_date")) go("/holidays", "Periode blackout tidak valid.");
   await q("INSERT INTO blackout_periods (start_date, end_date, note) VALUES ($1,$2,$3)", [g(fd, "start_date"), g(fd, "end_date"), g(fd, "note")]);
   go("/holidays", "Blackout ditambahkan.", "ok");
 }
+
 export async function deleteBlackout(fd) { await requireUser(["admin"]); await q("DELETE FROM blackout_periods WHERE id=$1", [+fd.get("id")]); redirect("/holidays"); }
