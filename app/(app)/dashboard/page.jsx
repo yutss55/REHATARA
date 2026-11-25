@@ -4,6 +4,7 @@ import { q, q1 } from "@/lib/db";
 import { Card, Status, Title, btn } from "@/components/ui";
 import { fmtPeriod, fmtNum } from "@/lib/fmt";
 
+
 const Stat = ({ n, l, bar }) => (
   <Card><p className="font-display text-3xl font-bold">{n}</p><p className="text-sm text-slate-500">{l}</p>
     {bar != null && <div className="mt-2 h-2 rounded bg-slate-200"><div className="h-2 rounded bg-teal-700" style={{ width: `${bar}%` }} /></div>}</Card>
