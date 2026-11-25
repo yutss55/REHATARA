@@ -1,8 +1,10 @@
 "use server";
+
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { savePhoto, deletePhoto } from "@/lib/photo";
 
 export async function updateProfile(fd) {
   const u = await requireUser();
@@ -17,4 +19,23 @@ export async function updateProfile(fd) {
     if (g("password")) await q("UPDATE users SET password_hash=$1 WHERE id=$2", [await bcrypt.hash(g("password"), 10), u.id]);
   } catch (e) { bad(e.code === "23505" ? "Username atau email sudah dipakai." : "Gagal menyimpan."); }
   redirect("/profile?ok=" + encodeURIComponent("Profil disimpan."));
+}
+
+export async function updatePhoto(fd) {
+  const u = await requireUser();
+  const f = fd.get("photo");
+  if (!f || !f.size) redirect("/profile?err=" + encodeURIComponent("Pilih file foto terlebih dahulu."));
+  let name;
+  try { name = await savePhoto(f); }
+  catch (e) { redirect("/profile?err=" + encodeURIComponent(e.message)); }
+  await q("UPDATE users SET photo=$1 WHERE id=$2", [name, u.id]);
+  await deletePhoto(u.photo);
+  redirect("/profile?ok=" + encodeURIComponent("Foto profil diperbarui."));
+}
+
+export async function removePhoto() {
+  const u = await requireUser();
+  await q("UPDATE users SET photo=NULL WHERE id=$1", [u.id]);
+  await deletePhoto(u.photo);
+  redirect("/profile?ok=" + encodeURIComponent("Foto profil dihapus."));
 }

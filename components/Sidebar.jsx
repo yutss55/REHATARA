@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -6,6 +5,7 @@ import { logout } from "@/app/actions/auth";
 import { ROLE } from "@/lib/fmt";
 import Logo from "@/components/Logo";
 import { usePathname } from "next/navigation";
+import Avatar from "@/components/Avatar";
 
 const NAV = {
   admin: [
@@ -35,6 +35,15 @@ const NAV = {
     ["/profile", "Profil"],
   ],
 };
+
+function initials(name = "") {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0].toUpperCase())
+    .join("");
+}
 
 export default function Sidebar({ user }) {
   const pathname = usePathname();
@@ -68,17 +77,17 @@ export default function Sidebar({ user }) {
         })}
       </nav>
 
-      <div className="border-t border-white/10 pt-3 text-sm">
-        <p className="font-semibold text-white">
-          {user.full_name}
-        </p>
+      <div className="mt-4 border-t border-white/10 pt-3">
+        <div className="flex items-center gap-2.5">
+          <Avatar user={user} size={36} />
+          <div className="min-w-0 text-xs">
+            <p className="truncate font-semibold text-white">{user.full_name}</p>
+            <p className="text-slate-400">{ROLE[user.role]}</p>
+          </div>
+        </div>
 
-        <p className="text-slate-400">
-          {ROLE[user.role]}
-        </p>
-
-        <form action={logout}>
-          <button className="mt-2 text-xs text-teal-300 underline">
+        <form action={logout} className="mt-2.5">
+          <button className="rounded-md bg-[#294650] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15">
             Keluar
           </button>
         </form>
