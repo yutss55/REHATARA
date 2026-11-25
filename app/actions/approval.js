@@ -23,7 +23,6 @@ async function decide(u, id, decision, note) {
   return null;
 }
 
-// Satu action untuk tombol per baris ("one"), maupun approve/reject terpilih ("decision" + ids).
 export async function processApprovals(fd) {
   const u = await requireUser(["leader", "hrd"]);
   const one = fd.get("one");
