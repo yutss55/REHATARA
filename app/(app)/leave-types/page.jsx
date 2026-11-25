@@ -13,8 +13,7 @@ export default async function LeaveTypes({ searchParams }) {
   const edit = sp.edit ? rows.find((r) => r.id === +sp.edit) : null;
   return (
     <>
-      <Title title="Jenis Cuti" sub="Disimpan di database, bukan hardcode. Aturan tiap jenis diatur Admin."><Link href="/leave-types#form" className={btn}>Tambah jenis cuti</Link></Title>
-      <Alert err={sp.err} ok={sp.ok} />
+      <Title title="Jenis Cuti"><Link href="/leave-types#form" className={btn}>Tambah jenis cuti</Link></Title>
       <Card className="mb-5">
         <Table head={["Jenis cuti", "Kuota per tahun", "Batas pengajuan", "Lampiran", "Potong kuota tahunan", "Status", "Aksi"]}>
           {rows.map((t) => (

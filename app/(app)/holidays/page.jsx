@@ -56,7 +56,6 @@ export default async function Holidays({ searchParams }) {
     <>
       <div className="mb-5">
         <h1 className="text-2xl font-bold">Fitur Lanjutan</h1>
-        <p className="text-sm text-slate-500">Opsional: hari libur, kapasitas tim, blackout, kuota hangus, dan kalender</p>
       </div>
       <Alert err={sp.err} ok={sp.ok} />
 
